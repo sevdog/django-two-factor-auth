@@ -9,7 +9,7 @@ from django.contrib.auth import load_backend
 from django.core.exceptions import SuspiciousOperation
 from django.core.signing import BadSignature, SignatureExpired
 from django.utils.decorators import method_decorator
-from django.utils.encoding import force_bytes
+from django.utils.encoding import force_bytes, force_str
 from django.utils.translation import gettext as _
 from formtools.wizard.forms import ManagementForm
 from formtools.wizard.storage.session import SessionStorage
@@ -273,6 +273,10 @@ def validate_remember_device_cookie(cookie, user, otp_device_id):
     timestamp, input_cookie_key, input_cookie_value = cookie.split(remember_device_cookie_separator, 3)
 
     cookie_key = hash_remember_device_cookie_key(otp_device_id)
+    if input_cookie_key[:2] == "b'" and input_cookie_key[-1] == "'":
+        # keep backward compatibility with previous implementation, this shall be removed in next major release
+        logger.warning('Received legacy cookie with bad bytes-encoding')
+        input_cookie_key = input_cookie_key[2:-1]
     if input_cookie_key != cookie_key:
         return False
 
@@ -291,7 +295,7 @@ def validate_remember_device_cookie(cookie, user, otp_device_id):
 
 
 def hash_remember_device_cookie_key(otp_device_id):
-    return str(base64.b64encode(force_bytes(otp_device_id)))
+    return force_str(base64.b64encode(force_bytes(otp_device_id)))
 
 
 def hash_remember_device_cookie_value(otp_device_id, user, timestamp):
